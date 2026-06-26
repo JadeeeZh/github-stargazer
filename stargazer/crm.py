@@ -473,7 +473,7 @@ CEND_SHORTLIST_COLS = ["rank", "name", "login", "source", "gtm_grade", "focus", 
 
 
 def _cend_shortlist(c):
-    """C-end builders ranked for user interviews / developer upsell: who actually TRIED EverOS
+    """C-end builders ranked for user interviews / developer upsell: who actually tried the repo
     (forked) + is an AI builder + is reachable. Forkers rank first (their feedback is gold)."""
     def reach(r):
         return bool(r.get("linkedin") or r.get("twitter") or r.get("email") or r.get("website"))
