@@ -38,6 +38,14 @@ Three zones (see `stargazer/config.py`):
 - **Deepline (`find-linkedin`) and the LinkedIn scraper cost money / credentials — ask first.**
 - **B-end qualification needs web research** (competitor? fixed-protocol? memory value?) — keyword
   matching only pre-filters. Run the research pass, write verdicts, then `score` again.
+- **Gate research by `company_status`, not by name-blacklisting.** The feed proves "is it a real
+  company" from free signals (domain / `/company/` LinkedIn / non-free email / ≥2 leads / domain-like
+  name) → proven / to-verify / unproven. Research **proven + to-verify + AI-focused unproven**, skip the
+  rest — that kills the junk long tail cheaply. But `unproven` is a *flag, not a drop*: a real stealth
+  startup can be unproven (no public footprint), so don't auto-discard AI-relevant ones.
+- **GitHub stars/forks are a *developer* signal, not a *company* signal** — so a chunk of B-end "companies"
+  are individuals' bio fragments or mascots. For a higher-precision company funnel, source from a company
+  DB (Crunchbase/LinkedIn-company/your TAM) and use GitHub as *enrichment* on those, rather than as the entry.
 
 ## Invariants — do NOT break when extending
 

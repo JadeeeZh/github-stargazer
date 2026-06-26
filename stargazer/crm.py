@@ -392,14 +392,20 @@ def icpmod_floor_b():
     return icpmod.GRADE_B_FLOOR
 
 
-COMPANY_FEED_COLS = ["company", "category", "icp_verdict", "memory_value", "best_grade",
-                     "lead_count", "best_rank", "sources", "what_they_do", "lead_with", "next_action"]
+COMPANY_FEED_COLS = ["company", "category", "company_status", "evidence", "icp_verdict",
+                     "memory_value", "best_grade", "lead_count", "best_rank", "sources",
+                     "what_they_do", "lead_with", "next_action"]
+_STATUS_ORD = {"proven": 0, "to-verify": 1, "unproven": 2}
 
 
 def _company_feed(b, verdicts):
     """Dedup B rows by _vnorm(company) -> one row per company (THE B-end deliverable).
+
     Survivor = the lead with the lowest (best/newest) best_rank; grade/sources aggregate the
-    company's leads; verdict fields come from the join (what_they_do from the verdict dict)."""
+    company's leads; verdict fields come from the join (what_they_do from the verdict dict).
+    `company_status` (proven/to-verify/unproven) records the free 'is it a real company?'
+    evidence — the cheap gate so expensive research can skip unproven names.
+    """
     from . import icp as icpmod
     groups = {}
     for r in b:
@@ -411,10 +417,13 @@ def _company_feed(b, verdicts):
         survivor = min(leads, key=lambda r: r["best_rank"] if isinstance(r.get("best_rank"), int) else 10 ** 9)
         best_grade = min((x["gtm_grade"] for x in leads), key=lambda g: GRADE_ORD[g])
         srcs = "+".join(sorted({x["source"] for x in leads}, key=lambda s: seed.SOURCE_ORDER.get(s, 9)))
+        ev = icpmod.company_evidence(leads)
         v = verdicts.get(k, {})
         rows.append({
             "company": survivor.get("company", ""),
             "category": icpmod.company_category(survivor.get("company", "")),
+            "company_status": icpmod.evidence_status(ev),
+            "evidence": ev,
             "icp_verdict": survivor.get("icp_verdict", ""),
             "memory_value": survivor.get("memory_value", ""),
             "best_grade": best_grade,
@@ -425,7 +434,9 @@ def _company_feed(b, verdicts):
             "lead_with": survivor.get("lead_with", ""),
             "next_action": survivor.get("next_action", ""),
         })
-    rows.sort(key=lambda x: (VERDICT_ORD.get(x["icp_verdict"], 6), GRADE_ORD[x["best_grade"]],
+    # researched verdict first; then evidence (proven->unproven); then recency. best_grade is
+    # NOT a gate or primary sort (it tracks GitHub activity, not ICP fit).
+    rows.sort(key=lambda x: (VERDICT_ORD.get(x["icp_verdict"], 6), _STATUS_ORD[x["company_status"]],
                              x["best_rank"] if isinstance(x["best_rank"], int) else 1e9))
     return rows
 

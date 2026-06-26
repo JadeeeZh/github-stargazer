@@ -20,6 +20,8 @@ targets sit on top.
 |---|---|
 | **company** | the company's display name (best/most-recent lead's value). |
 | **category** | coarse *type* triage on the name: **candidate** (real-ish company, worth pursuing/researching) · **academic** (university/school/institute → usually not an agent company) · **bigtech** (Microsoft/Tencent/… → builds its own; the person is a champion, not an account) · **junk** (placeholder/garbled string). |
+| **company_status** | "**prove it's a real company**" gate from free signals (a real company domain, a `/company/` LinkedIn, a non-free email, ≥2 people from it, or a domain-like name): **proven** (≥2 signals) · **to-verify** (1) · **unproven** (0). Use it to focus expensive research — research *proven + to-verify + AI-focused unproven*, skip the rest. **Not a hard drop:** a real stealth startup can be `unproven` (no public footprint yet), so don't blanket-discard. |
+| **evidence** | the count (0–N) of those proof signals behind `company_status`. |
 | **icp_verdict** | the **researched** verdict (blank = not yet researched). See the table below. |
 | **memory_value** | which value the fit hangs on (only meaningful for Tier A / Yellow): **User** (knows the person), **Agent** (gets better with use), **Shared** (team knowledge), **User+Agent**, or **none**. |
 | **best_grade** | the **automatic** keyword grade (A/B/C) — the best among this company's people. A≥9, B≥5, else C (score = ICP-keyword match + source weight + AI-focus + seniority + identifiability + recency). |

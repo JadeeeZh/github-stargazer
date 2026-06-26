@@ -141,6 +141,71 @@ def _norm_company(s):
     return re.sub(r"[^\w一-鿿 /.&-]", "", (s or "").lower()).strip()
 
 
+# --- "prove it's a real company" signals (free; computed from fields we already have) ---
+# A company name that is really a person's ROLE/bio, not an org (high-noise on GitHub).
+_ROLE_RE = re.compile(
+    r"\b(engineer|developer|programmer|coder|student|intern|freelanc\w*|hobbyist|sde|swe|"
+    r"researcher|scientist|consultant|designer|analyst|enthusiast|specialist|strategist|"
+    r"creator|maker|nerd|geek)\b|独立开发|工程師|程序员|程式|求职|在校|学生|一般人|貧民|自由职业", re.I)
+# tokens that mark a genuine org -> protect from the role/junk filters
+_COMPANY_MARKER = re.compile(
+    r"\b(inc|llc|ltd|corp|gmbh|plc|labs?|technologies|systems|software|studio|ventures|capital|"
+    r"university|institute|college|group|holdings|solutions)\b|\.(ai|io|com|co|dev|app|net|org)\b", re.I)
+# website hosts that are personal/link-in-bio, not a company domain
+_PERSONAL_HOST = re.compile(
+    r"github\.io|gitee\.io|vercel\.app|netlify\.|pages\.dev|linktr\.ee|notion\.site|carrd\.co|"
+    r"wixsite|blogspot|wordpress\.com|medium\.com|substack\.com|about\.me|bio\.link|beacons\.ai", re.I)
+_FREE_EMAIL = re.compile(r"@(gmail|qq|163|126|outlook|hotmail|yahoo|icloud|proton|protonmail|"
+                         r"foxmail|sina|aol|gmx|mail)\.", re.I)
+_TLD_RE = re.compile(r"\.(ai|io|com|co|dev|app|net|org|so|xyz|tech|cloud|sh)\b", re.I)
+
+
+def _is_role_bio(name):
+    """True if the 'company' field is really a person's role/bio, not an org."""
+    n = (name or "").strip()
+    if not n or _COMPANY_MARKER.search(n):
+        return False
+    return bool(_ROLE_RE.search(n)) and len(n.split()) <= 4
+
+
+def real_domain_website(url):
+    return bool(url) and "." in url and not _PERSONAL_HOST.search(url)
+
+
+def is_company_linkedin(url):
+    return "/company/" in (url or "").lower()
+
+
+def is_corp_email(email):
+    return bool(email) and "@" in email and not _FREE_EMAIL.search(email)
+
+
+def domain_like_name(name):
+    return bool(_TLD_RE.search(name or ""))
+
+
+def company_evidence(leads):
+    """Count free 'proof it's a real company' signals across a company's leads.
+    0 -> unproven (likely junk/individual), 1 -> to-verify, >=2 -> proven. Per the
+    reversal: don't blacklist names, require evidence."""
+    ev = 0
+    if any(real_domain_website(x.get("website")) for x in leads):
+        ev += 1
+    if any(is_company_linkedin(x.get("linkedin")) for x in leads):
+        ev += 1
+    if any(is_corp_email(x.get("email")) for x in leads):
+        ev += 1
+    if len(leads) >= 2:                       # >=2 distinct people -> same company
+        ev += 1
+    if leads and domain_like_name(leads[0].get("company")):
+        ev += 1
+    return ev
+
+
+def evidence_status(ev):
+    return "proven" if ev >= 2 else "to-verify" if ev == 1 else "unproven"
+
+
 # Coarse company-TYPE triage for the B-end feed (a hint, not gospel).
 _BIGTECH = {
     "microsoft", "google", "alphabet", "youtube", "tencent", "alibaba", "bytedance", "baidu",
@@ -189,6 +254,8 @@ def has_real_company(r):
         return False  # emoji / symbols only
     if _norm_company(cl) in _PLACEHOLDER_GENERIC:
         return False
+    if _is_role_bio(c):
+        return False  # the "company" is really a person's role/bio -> they're a C-end individual
     loc = (r.get("location") or "").strip().lower()
     toks = [t for t in re.split(r"[\s,/|]+", cl) if t]
     is_location = (len(toks) <= 3 and (cl == loc or _norm_company(raw).lower() == loc
