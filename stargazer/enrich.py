@@ -4,7 +4,7 @@ Free, no token. Extracts name, company, location, bio, personal website,
 followers, top languages, notable repos, and any publicly listed
 LinkedIn / Twitter / email. Resumable: one JSON per user under work/enriched/.
 """
-import glob, json, os, re, time
+import glob, html, json, os, re, time
 from collections import Counter
 from . import config, seed
 from .http import get
@@ -14,7 +14,7 @@ def _find(h, *pats):
     for p in pats:
         m = re.search(p, h, re.S | re.I)
         if m:
-            return re.sub(r"\s+", " ", m.group(1)).strip()
+            return html.unescape(re.sub(r"\s+", " ", m.group(1)).strip())
     return ""
 
 
@@ -80,9 +80,9 @@ def enrich_one(login):
     if em and "@" in em:
         rec["email"] = em.strip()
 
-    rec["top_languages"] = [l for l, _ in Counter(
+    rec["top_languages"] = [html.unescape(l) for l, _ in Counter(
         re.findall(r'itemprop="programmingLanguage">([^<]+)<', h)).most_common(6)]
-    rec["notable_repos"] = [re.sub(r"\s+", " ", x).strip()
+    rec["notable_repos"] = [html.unescape(re.sub(r"\s+", " ", x).strip())
                             for x in re.findall(r'class="repo"[^>]*>([^<]+)<', h)][:6]
 
     rich = any([rec["github_name"].strip() not in ("", login), rec["bio"], rec["company"],
