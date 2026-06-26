@@ -286,6 +286,61 @@ def build_gtm(records, icp, slug, verdicts=None):
     return b, c, sparse
 
 
+# Legend for the evaluative/derived (non-factual) columns — shipped as an Explanation
+# sheet in the workbook + explanation.csv. ("H", title) = section header; ("F", field, meaning, values).
+LEGEND = [
+    ("H", "READ FIRST — two grades, don't confuse them"),
+    ("F", "gtm_grade", "AUTO keyword score (GitHub activity + AI/ICP terms). NOT whether it's a buyable fit; NOT a gate.", "A (score>=9) / B (>=5) / C"),
+    ("F", "icp_verdict", "The RESEARCHED judgment (web research per your ICP). Trust this over gtm_grade.", "see 'Researched verdict' below; blank = not researched"),
+    ("F", "rank / best_rank", "Recency only: 1 = most-recent star/fork, higher = older. Lower is fresher, NOT better.", "1..N"),
+    ("H", "Engagement & recency"),
+    ("F", "source", "How they engaged. fork = took the code (stronger intent); both = strongest.", "star / fork / both"),
+    ("F", "fork_rank / star_rank", "Position in each list (blank if not in that list).", "1..N or blank"),
+    ("H", "Bucket & auto tags (derived from the GitHub profile)"),
+    ("F", "bucket", "B = has a real company; C = individual builder (no real company).", "B / C"),
+    ("F", "lead_type / segment", "Role classification.", "Founder/Exec, AI/ML, Software Eng, Product, ..."),
+    ("F", "seniority / company_type / focus", "Derived tags from profile + bio (+ LinkedIn if scraped).", ""),
+    ("F", "linkedin_status", "verified = logged-in scrape; found = a URL we have; else not listed.", "verified / found / not listed on GitHub"),
+    ("F", "priority", "Legacy A/B/C (identifiability + recency). Secondary to icp_verdict.", "A / B / C"),
+    ("F", "icp_fit", "Number of ICP keywords matched.", "0..N"),
+    ("H", "B-end company gate (free pre-filter — 'prove it's a real company')"),
+    ("F", "category", "Company TYPE triage on the name.", "candidate / academic / bigtech / junk"),
+    ("F", "company_status", "How much free evidence it's a real company.", "proven (>=2) / to-verify (1) / unproven (0)"),
+    ("F", "evidence", "Count of proofs: real domain / /company/ LinkedIn / non-free email / >=2 leads / domain-like name.", "0..5"),
+    ("F", "research_status", "What to do next. Filter 'research' for the next batch.", "research / done / auto-dq / skip"),
+    ("H", "Researched verdict (web research per ICP — the real B-end judgment)"),
+    ("F", "icp_verdict", "Direct-sales verdict.", "Tier A / Yellow flag / Channel / Supplier / Scout / Disqualified / Not a company / Unknown"),
+    ("F", "memory_value", "Which memory type the fit hangs on (User = remembers the person; Agent = gets better with use; Shared = team knowledge).", "User / Agent / Shared / User+Agent / none"),
+    ("F", "what_they_do / why_fit / lead_with", "One-line description / why it fits the ICP / the pain to open outreach with.", ""),
+    ("F", "next_action / verdict_confidence / contact", "Suggested move / research confidence / best contact.", ""),
+    ("H", "C-end shortlist extras (cend_shortlist.csv)"),
+    ("F", "tried", "Forked = actually ran it -> best user-interview subject.", "yes / blank"),
+    ("F", "reachable", "Has a non-GitHub contact (LinkedIn/X/email/site).", "yes / github-only"),
+]
+
+
+def _write_explanation_sheet(wb):
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    ws = wb.create_sheet("Explanation")
+    hfill = PatternFill("solid", fgColor="1F4E78"); hfont = Font(bold=True, color="FFFFFF")
+    ws.append(["Field", "What it means", "Values"])
+    for i in range(1, 4):
+        ws.cell(1, i).fill = hfill; ws.cell(1, i).font = hfont
+    for row in LEGEND:
+        if row[0] == "H":
+            ws.append([row[1], "", ""])
+            c = ws.cell(ws.max_row, 1); c.font = Font(bold=True, color="1F4E78")
+        else:
+            ws.append([row[1], row[2], row[3]])
+    for col, w in (("A", 34), ("B", 82), ("C", 46)):
+        ws.column_dimensions[col].width = w
+    for r in range(2, ws.max_row + 1):
+        ws.cell(r, 2).alignment = Alignment(wrap_text=True, vertical="top")
+    ws.freeze_panes = "A2"
+    return ws
+
+
 _GTM_W = {"bucket": 8, "source": 10, "fork_rank": 9, "star_rank": 9, "icp_fit": 8, "gtm_grade": 9}
 
 
@@ -329,6 +384,7 @@ def _write_gtm_xlsx(b, c, sparse, icp, path):
 
     wb.remove(wb.active)
     lead_sheet("B-end target companies", b, BEND_COLS)
+    _write_explanation_sheet(wb)  # 2nd tab: legend for the evaluative/derived fields
     lead_sheet("C-end high-potential", c, GTM_COLS)
 
     ss = wb.create_sheet("Summary")
@@ -602,6 +658,11 @@ def run_gtm(slug, icp_id, scraped_this_run=0):
         w.writerows(emit(b, BEND_COLS) + emit(c, BEND_COLS))
     with open(paths["csv_company_feed"], "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=COMPANY_FEED_COLS); w.writeheader(); w.writerows(feed)
+    # field legend (also a sheet in the xlsx) for whoever opens the CSVs in Sheets/Excel
+    with open(paths["explanation_csv"], "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f); w.writerow(["section", "field", "what_it_means", "values"])
+        for row in LEGEND:
+            w.writerow([row[1], "", "", ""] if row[0] == "H" else ["", row[1], row[2], row[3]])
     li = [{"profile_url": r["linkedin"], "candidate_id": r["login"], "notes": r["name"]}
           for r in (b + c) if r["linkedin"]]
     with open(paths["linkedin_csv"], "w", newline="", encoding="utf-8") as f:
