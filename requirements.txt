@@ -1,0 +1,8 @@
+# Core fetch/enrich/website/CRM uses only the Python standard library.
+# openpyxl is the single optional dependency — it adds the formatted .xlsx
+# workbook. Without it the tool still writes the CSVs.
+openpyxl>=3.1
+
+# Optional, not pip-installable here:
+#   - deepline CLI  -> `find-linkedin` step (LinkedIn lookup). https://code.deepline.com
+#   - a GitHub token in $GITHUB_TOKEN -> full stargazer coverage (>960) via the API

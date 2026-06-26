@@ -1,0 +1,27 @@
+# shared profile cache + per-repo seeds (expensive; regenerable) and per-run deliverables
+.cache/
+runs/
+# legacy layout (pre-productization)
+work/
+output/
+
+# company-specific config stays LOCAL — only the generic template ships
+icps/*.md
+!icps/_template.md
+# company strategy docs (e.g. ICP criteria) — local only, never publish
+docs/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+# local agent/tool settings
+.claude/
