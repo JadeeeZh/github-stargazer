@@ -38,7 +38,8 @@ def _fetch_html(repo, limit, sleep):
 
 def _fetch_api(repo, limit, token, sleep):
     collected, page = [], 1
-    headers = {"Authorization": f"Bearer {token}"}
+    # star+json gives starred_at; response items become {"starred_at":..., "user":{...}}
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.star+json"}
     while len(collected) < limit:
         url = f"https://api.github.com/repos/{repo}/stargazers?per_page=100&page={page}"
         data, status = get_json(url, headers=headers)
@@ -48,9 +49,11 @@ def _fetch_api(repo, limit, token, sleep):
         for u in data:
             if len(collected) >= limit:
                 break
-            login = u.get("login") if isinstance(u, dict) else None
+            star_at = u.get("starred_at") if isinstance(u, dict) else None
+            who = u.get("user") if isinstance(u, dict) and "user" in u else u
+            login = who.get("login") if isinstance(who, dict) else None
             if login:
-                collected.append({"login": login, "rank": len(collected) + 1})
+                collected.append({"login": login, "rank": len(collected) + 1, "starred_at": star_at or ""})
         print(f"  API page {page}: total {len(collected)}")
         if len(data) < 100:
             break

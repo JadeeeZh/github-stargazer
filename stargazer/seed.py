@@ -27,20 +27,22 @@ def load_seeds(slug):
     possibly-stale `count` field in the seed JSON.
     """
     paths = config.repo_paths(slug)
+    blank = {"star_rank": None, "fork_rank": None, "forked_at": None, "starred_at": None}
     seeds = {}
     for m in _safe_load(paths["stargazers"], "stargazers"):
         lo = m.get("login")
         if not lo:
             continue
-        e = seeds.setdefault(lo, {"star_rank": None, "fork_rank": None, "forked_at": None})
+        e = seeds.setdefault(lo, dict(blank))
         r = m.get("rank")
         if isinstance(r, int) and (e["star_rank"] is None or r < e["star_rank"]):
             e["star_rank"] = r
+        e["starred_at"] = m.get("starred_at") or e["starred_at"]  # only if API fetch captured it
     for m in _safe_load(paths["forkers"], "forkers"):
         lo = m.get("login")
         if not lo:
             continue
-        e = seeds.setdefault(lo, {"star_rank": None, "fork_rank": None, "forked_at": None})
+        e = seeds.setdefault(lo, dict(blank))
         r = m.get("rank")
         if isinstance(r, int) and (e["fork_rank"] is None or r < e["fork_rank"]):
             e["fork_rank"] = r
@@ -61,11 +63,19 @@ def all_logins(slug, seeds=None):
 
 
 def source_of(login, seeds):
-    """-> {"source", "star_rank", "fork_rank", "best_rank", "best_clock", "forked_at"}."""
-    v = seeds.get(login, {"star_rank": None, "fork_rank": None, "forked_at": None})
+    """-> {source, star_rank, fork_rank, best_rank, best_clock, forked_at, starred_at, engaged_at}.
+
+    engaged_at = the real date (YYYY-MM-DD) they engaged — fork date preferred, else star date.
+    star dates are only present when stargazers were fetched via the API (token); HTML fetch
+    has none, so engaged_at is "" for star-only HTML-sourced leads.
+    """
+    v = seeds.get(login, {"star_rank": None, "fork_rank": None, "forked_at": None, "starred_at": None})
     sr, fr = v["star_rank"], v["fork_rank"]
     src = "both" if (sr is not None and fr is not None) else "fork" if fr is not None else "star"
     cands = [(r, clk) for r, clk in ((sr, "star"), (fr, "fork")) if isinstance(r, int)]
     best_rank, best_clock = (min(cands) if cands else (10 ** 9, "none"))
-    return {"source": src, "star_rank": sr, "fork_rank": fr,
-            "best_rank": best_rank, "best_clock": best_clock, "forked_at": v["forked_at"]}
+    forked_at, starred_at = v.get("forked_at"), v.get("starred_at")
+    engaged_at = ((forked_at or starred_at or "")[:10])  # date part; fork date preferred
+    return {"source": src, "star_rank": sr, "fork_rank": fr, "best_rank": best_rank,
+            "best_clock": best_clock, "forked_at": forked_at, "starred_at": starred_at,
+            "engaged_at": engaged_at}

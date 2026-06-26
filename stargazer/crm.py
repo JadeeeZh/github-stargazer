@@ -172,7 +172,7 @@ LEAD_COLS = ["rank", "name", "login", "lead_type", "segment", "priority", "title
 # GTM workflow (Step 3): ICP-bucketed CRM. `gtm_grade` is a bucket-relative grade,
 # distinct from the absolute `priority` column.
 # ======================================================================================
-GTM_COLS = LEAD_COLS + ["bucket", "source", "fork_rank", "star_rank", "icp_fit", "gtm_grade"]
+GTM_COLS = LEAD_COLS + ["engaged_at", "bucket", "source", "fork_rank", "star_rank", "icp_fit", "gtm_grade"]
 GRADE_ORD = {"A": 0, "B": 1, "C": 2}
 
 # Research-verdict columns, joined onto B-end rows from work/icp_verdicts.json (if present).
@@ -252,7 +252,8 @@ def build_gtm(records, icp, slug, verdicts=None):
         seg = segment(r); lt = lead_type(seg); foc = focus(r)
         sc = icpmod.score(r, icp, src, bkt, m)
         row = {
-            "rank": src["best_rank"], "name": (r.get("linkedin_name") or name),
+            "rank": src["best_rank"], "engaged_at": src.get("engaged_at", ""),
+            "name": (r.get("linkedin_name") or name),
             "login": login, "lead_type": lt, "segment": seg,
             "priority": priority(r, seg, lt, foc),  # legacy priority preserved as-is
             "title": r.get("linkedin_title", ""), "company": disp_company(r),
@@ -292,7 +293,8 @@ LEGEND = [
     ("H", "READ FIRST — two grades, don't confuse them"),
     ("F", "gtm_grade", "AUTO keyword score (GitHub activity + AI/ICP terms). NOT whether it's a buyable fit; NOT a gate.", "A (score>=9) / B (>=5) / C"),
     ("F", "icp_verdict", "The RESEARCHED judgment (web research per your ICP). Trust this over gtm_grade.", "see 'Researched verdict' below; blank = not researched"),
-    ("F", "rank / best_rank", "Recency only: 1 = most-recent star/fork, higher = older. Lower is fresher, NOT better.", "1..N"),
+    ("F", "engaged_at", "The REAL date they forked/starred (fork date preferred). Use this, not best_rank. Blank for star-only fetched without a token (HTML has no star dates).", "YYYY-MM-DD"),
+    ("F", "rank / best_rank", "Internal recency RANK (1 = newest) used only for sorting — read engaged_at for the actual date.", "1..N"),
     ("H", "Engagement & recency"),
     ("F", "source", "How they engaged. fork = took the code (stronger intent); both = strongest.", "star / fork / both"),
     ("F", "fork_rank / star_rank", "Position in each list (blank if not in that list).", "1..N or blank"),
@@ -341,7 +343,8 @@ def _write_explanation_sheet(wb):
     return ws
 
 
-_GTM_W = {"bucket": 8, "source": 10, "fork_rank": 9, "star_rank": 9, "icp_fit": 8, "gtm_grade": 9}
+_GTM_W = {"engaged_at": 12, "bucket": 8, "source": 10, "fork_rank": 9, "star_rank": 9,
+          "icp_fit": 8, "gtm_grade": 9}
 
 
 def _write_gtm_xlsx(b, c, sparse, icp, path):
@@ -449,8 +452,8 @@ def icpmod_floor_b():
 
 
 COMPANY_FEED_COLS = ["company", "research_status", "icp_verdict", "category", "company_status",
-                     "evidence", "memory_value", "best_grade", "lead_count", "best_rank",
-                     "sources", "what_they_do", "lead_with", "next_action"]
+                     "evidence", "memory_value", "best_grade", "lead_count", "engaged_at",
+                     "best_rank", "sources", "what_they_do", "lead_with", "next_action"]
 _STATUS_ORD = {"proven": 0, "to-verify": 1, "unproven": 2}
 # research_status = the single "what to do next" gate (kills manual shortlist rebuilding):
 #   done     -> already has an icp_verdict
@@ -509,6 +512,7 @@ def _company_feed(b, verdicts):
             "memory_value": survivor.get("memory_value", ""),
             "best_grade": best_grade,
             "lead_count": len(leads),
+            "engaged_at": survivor.get("engaged_at", ""),
             "best_rank": survivor["best_rank"] if isinstance(survivor.get("best_rank"), int) else "",
             "sources": srcs,
             "what_they_do": v.get("what_they_do", ""),
@@ -523,9 +527,9 @@ def _company_feed(b, verdicts):
     return rows
 
 
-CEND_SHORTLIST_COLS = ["rank", "name", "login", "source", "gtm_grade", "focus", "followers",
-                       "tried", "reachable", "linkedin", "twitter", "email", "website", "github",
-                       "bio", "notable_repos"]
+CEND_SHORTLIST_COLS = ["rank", "engaged_at", "name", "login", "source", "gtm_grade", "focus",
+                       "followers", "tried", "reachable", "linkedin", "twitter", "email", "website",
+                       "github", "bio", "notable_repos"]
 
 
 def _cend_shortlist(c):
