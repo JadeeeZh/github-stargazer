@@ -86,4 +86,6 @@ need per-company **web research**, which is a separate step:
 - Public star/fork lists carry bots, placeholder companies, and individual hobbyists; scoring pushes real leads up — eyeball the top before outreach.
 - Everything reads only public GitHub. LinkedIn deep-scrape is gated behind *your* login in the separate tool.
 
-See [AGENTS.md](AGENTS.md) to drive this with an AI agent. Bring your own `icps/<id>.md` (start from [icps/_template.md](icps/_template.md)).
+See [AGENTS.md](AGENTS.md) to drive this with an AI agent, [FIELDS.md](FIELDS.md) for every output
+column, and [LEARNINGS.md](LEARNINGS.md) for what to expect (B-end is thin, forkers ≫ stargazers,
+the grade isn't ICP fit, etc.). Bring your own `icps/<id>.md` (start from [icps/_template.md](icps/_template.md)).

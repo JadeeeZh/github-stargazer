@@ -19,7 +19,8 @@ targets sit on top.
 | field | meaning |
 |---|---|
 | **company** | the company's display name (best/most-recent lead's value). |
-| **category** | coarse *type* triage on the name: **candidate** (real-ish company, worth pursuing/researching) · **academic** (university/school/institute → usually not an agent company) · **bigtech** (Microsoft/Tencent/… → builds its own; the person is a champion, not an account) · **junk** (placeholder/garbled string). |
+| **research_status** | **the "what to do next" gate** — `research` (candidate worth web-research; **this is your next-batch filter**) · `done` (already has an `icp_verdict`) · `auto-dq` (academic/bigtech/junk → non-customer per ICP, don't spend research) · `skip` (candidate but unproven & not AI-focused → the junk long tail). Filtering `research_status == research` replaces hand-building a shortlist each round. |
+| **category** | coarse *type* triage on the name: **candidate** (real-ish company) · **academic** (university/school → not an agent company) · **bigtech** (builds its own; the person is a champion, not an account) · **junk** (placeholder/garbled). |
 | **company_status** | "**prove it's a real company**" gate from free signals (a real company domain, a `/company/` LinkedIn, a non-free email, ≥2 people from it, or a domain-like name): **proven** (≥2 signals) · **to-verify** (1) · **unproven** (0). Use it to focus expensive research — research *proven + to-verify + AI-focused unproven*, skip the rest. **Not a hard drop:** a real stealth startup can be `unproven` (no public footprint yet), so don't blanket-discard. |
 | **evidence** | the count (0–N) of those proof signals behind `company_status`. |
 | **icp_verdict** | the **researched** verdict (blank = not yet researched). See the table below. |
@@ -54,6 +55,13 @@ People with no real company surfaced but a strong individual signal (AI/ML focus
 followers, or real repos). Here a name + contact is the unit. Key columns: `name`, `login`,
 `segment`, `gtm_grade`, `focus`, `linkedin`, `website`, `twitter`, `email`, `github`, `bio`,
 `top_languages`, `notable_repos`, `source`, `rank`.
+
+## `cend_shortlist.csv` — C-end builders ranked for user interviews / developer upsell
+
+The actionable C-end cut: AI/ML-focused (or grade-A) individuals, **ranked forker-first** (a forker
+actually ran the code — the best interview subject), then by grade, reachability, recency. Adds two
+flags on top of the C-end columns: **`tried`** (`yes` = forked/both, i.e. used it) and **`reachable`**
+(`yes` = has LinkedIn/X/email/site, vs `github-only`). The gold list = `tried==yes` + `reachable==yes`.
 
 ## `bend_companies.csv` — B-end leads, one row per *person* (not deduped)
 

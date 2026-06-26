@@ -392,10 +392,30 @@ def icpmod_floor_b():
     return icpmod.GRADE_B_FLOOR
 
 
-COMPANY_FEED_COLS = ["company", "category", "company_status", "evidence", "icp_verdict",
-                     "memory_value", "best_grade", "lead_count", "best_rank", "sources",
-                     "what_they_do", "lead_with", "next_action"]
+COMPANY_FEED_COLS = ["company", "research_status", "icp_verdict", "category", "company_status",
+                     "evidence", "memory_value", "best_grade", "lead_count", "best_rank",
+                     "sources", "what_they_do", "lead_with", "next_action"]
 _STATUS_ORD = {"proven": 0, "to-verify": 1, "unproven": 2}
+# research_status = the single "what to do next" gate (kills manual shortlist rebuilding):
+#   done     -> already has an icp_verdict
+#   auto-dq  -> academic/bigtech/junk type => non-customer per ICP, don't spend research
+#   research -> candidate company worth web-research (has evidence OR is AI-focused)
+#   skip     -> candidate but unproven AND not AI-focused => the junk long tail, skip
+_RESEARCH_ORD = {"research": 0, "done": 1, "auto-dq": 2, "skip": 3}
+
+
+def _ai_focused(leads):
+    return any((x.get("focus") or "").startswith(("AI", "ML")) for x in leads)
+
+
+def _research_status(icp_verdict, category, company_status, ai_focused):
+    if icp_verdict:
+        return "done"
+    if category in ("academic", "bigtech", "junk"):
+        return "auto-dq"
+    if company_status in ("proven", "to-verify") or ai_focused:
+        return "research"
+    return "skip"
 
 
 def _company_feed(b, verdicts):
@@ -418,13 +438,18 @@ def _company_feed(b, verdicts):
         best_grade = min((x["gtm_grade"] for x in leads), key=lambda g: GRADE_ORD[g])
         srcs = "+".join(sorted({x["source"] for x in leads}, key=lambda s: seed.SOURCE_ORDER.get(s, 9)))
         ev = icpmod.company_evidence(leads)
+        cstatus = icpmod.evidence_status(ev)
+        cat = icpmod.company_category(survivor.get("company", ""))
+        verdict = survivor.get("icp_verdict", "")
+        rstatus = _research_status(verdict, cat, cstatus, _ai_focused(leads))
         v = verdicts.get(k, {})
         rows.append({
             "company": survivor.get("company", ""),
-            "category": icpmod.company_category(survivor.get("company", "")),
-            "company_status": icpmod.evidence_status(ev),
+            "research_status": rstatus,
+            "icp_verdict": verdict,
+            "category": cat,
+            "company_status": cstatus,
             "evidence": ev,
-            "icp_verdict": survivor.get("icp_verdict", ""),
             "memory_value": survivor.get("memory_value", ""),
             "best_grade": best_grade,
             "lead_count": len(leads),
@@ -434,14 +459,45 @@ def _company_feed(b, verdicts):
             "lead_with": survivor.get("lead_with", ""),
             "next_action": survivor.get("next_action", ""),
         })
-    # researched verdict first; then evidence (proven->unproven); then recency. best_grade is
-    # NOT a gate or primary sort (it tracks GitHub activity, not ICP fit).
-    rows.sort(key=lambda x: (VERDICT_ORD.get(x["icp_verdict"], 6), _STATUS_ORD[x["company_status"]],
+    # done/research first (verdict tier, then evidence), then auto-dq/skip last; best_grade is
+    # NOT a gate or sort key (it tracks GitHub activity, not ICP fit).
+    rows.sort(key=lambda x: (_RESEARCH_ORD[x["research_status"]], VERDICT_ORD.get(x["icp_verdict"], 6),
+                             _STATUS_ORD[x["company_status"]],
                              x["best_rank"] if isinstance(x["best_rank"], int) else 1e9))
     return rows
 
 
-def _write_manifest(slug, icp_id, icp, b, c, sparse, feed, scraped_this_run, path):
+CEND_SHORTLIST_COLS = ["rank", "name", "login", "source", "gtm_grade", "focus", "followers",
+                       "tried", "reachable", "linkedin", "twitter", "email", "website", "github",
+                       "bio", "notable_repos"]
+
+
+def _cend_shortlist(c):
+    """C-end builders ranked for user interviews / developer upsell: who actually TRIED EverOS
+    (forked) + is an AI builder + is reachable. Forkers rank first (their feedback is gold)."""
+    def reach(r):
+        return bool(r.get("linkedin") or r.get("twitter") or r.get("email") or r.get("website"))
+
+    def tried(r):
+        return r.get("source") in ("fork", "both")
+
+    def builder(r):
+        return (r.get("focus") or "").startswith(("AI", "ML")) or r.get("gtm_grade") == "A"
+
+    picked = [r for r in c if builder(r)]
+    picked.sort(key=lambda r: (0 if tried(r) else 1, GRADE_ORD[r["gtm_grade"]],
+                               0 if reach(r) else 1,
+                               r.get("best_rank") if isinstance(r.get("best_rank"), int) else 1e9))
+    out = []
+    for r in picked:
+        d = {k: r.get(k, "") for k in CEND_SHORTLIST_COLS}
+        d["tried"] = "yes" if tried(r) else ""
+        d["reachable"] = "yes" if reach(r) else "github-only"
+        out.append(d)
+    return out
+
+
+def _write_manifest(slug, icp_id, icp, b, c, sparse, feed, scraped_this_run, path, cend_count=0):
     import datetime
     import hashlib
     rp = config.repo_paths(slug)
@@ -480,6 +536,7 @@ def _write_manifest(slug, icp_id, icp, b, c, sparse, feed, scraped_this_run, pat
             {"name": "bend_company_feed.csv", "role": "SEND to your company-enrichment / ICP research pass", "rows": len(feed)},
             {"name": "bend_companies.csv", "role": "B-end leads (per person) + verdicts", "rows": len(b)},
             {"name": "cend_individuals.csv", "role": "C-end AI-builder individuals + contacts", "rows": len(c)},
+            {"name": "cend_shortlist.csv", "role": "C-end builders ranked for user interviews / upsell (forkers first)", "rows": cend_count},
             {"name": "linkedin_to_scrape.csv", "role": "SEND to LinkedIn_Profile_Scraper", "rows": sum(1 for r in (b + c) if r["linkedin"])},
             {"name": "gtm_crm.xlsx", "role": "master B+C workbook", "rows": len(b) + len(c)},
         ],
@@ -537,6 +594,9 @@ def run_gtm(slug, icp_id, scraped_this_run=0):
         w = csv.DictWriter(f, fieldnames=BEND_COLS); w.writeheader(); w.writerows(emit(b, BEND_COLS))
     with open(paths["csv_c"], "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=GTM_COLS); w.writeheader(); w.writerows(emit(c, GTM_COLS))
+    cend_short = _cend_shortlist(c)
+    with open(paths["csv_cend_shortlist"], "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=CEND_SHORTLIST_COLS); w.writeheader(); w.writerows(cend_short)
     with open(paths["csv"], "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=BEND_COLS); w.writeheader()
         w.writerows(emit(b, BEND_COLS) + emit(c, BEND_COLS))
@@ -555,12 +615,15 @@ def run_gtm(slug, icp_id, scraped_this_run=0):
         w = csv.DictWriter(f, fieldnames=vcols, extrasaction="ignore")
         w.writeheader(); w.writerows(joined)
     _write_gtm_xlsx(b, c, sparse, icp, paths["xlsx"])
-    manifest = _write_manifest(slug, icp_id, icp, b, c, sparse, feed, scraped_this_run, paths["manifest"])
+    manifest = _write_manifest(slug, icp_id, icp, b, c, sparse, feed, scraped_this_run,
+                               paths["manifest"], cend_count=len(cend_short))
     _write_readme(manifest, paths["readme"])
 
     print("=== GTM BUILD COMPLETE ===")
     print(f"B-end: {len(b)} leads / {len(feed)} distinct companies | C-end: {len(c)} | "
           f"sparse: {len(sparse)}")
+    print("research_status:", dict(Counter(x["research_status"] for x in feed)),
+          f"| C-end interview shortlist: {len(cend_short)}")
     print("B grade:", dict(Counter(x["gtm_grade"] for x in b)),
           "| C grade:", dict(Counter(x["gtm_grade"] for x in c)))
     if joined:

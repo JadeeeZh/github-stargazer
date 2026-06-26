@@ -78,6 +78,7 @@ def run_paths(slug, icp_id):
             "csv_b": os.path.join(d, "bend_companies.csv"),
             "csv_company_feed": os.path.join(d, "bend_company_feed.csv"),
             "csv_c": os.path.join(d, "cend_individuals.csv"),
+            "csv_cend_shortlist": os.path.join(d, "cend_shortlist.csv"),
             "linkedin_csv": os.path.join(d, "linkedin_to_scrape.csv"),
             "verdicts_csv": os.path.join(r, "verdicts.csv"),
             "targets_md": os.path.join(r, "targets.md")}
