@@ -159,7 +159,7 @@ def build_leads(records):
     return leads, sparse
 
 
-LEAD_COLS = ["rank", "name", "login", "lead_type", "segment", "priority", "title", "company",
+LEAD_COLS = ["name", "login", "lead_type", "segment", "priority", "title", "company",
              "seniority", "company_type", "focus", "location", "linkedin_status",
              "linkedin", "website", "twitter", "email", "github", "followers",
              "bio", "top_languages", "notable_repos"]
@@ -293,8 +293,7 @@ LEGEND = [
     ("H", "READ FIRST — two grades, don't confuse them"),
     ("F", "gtm_grade", "AUTO keyword score (GitHub activity + AI/ICP terms). NOT whether it's a buyable fit; NOT a gate.", "A (score>=9) / B (>=5) / C"),
     ("F", "icp_verdict", "The RESEARCHED judgment (web research per your ICP). Trust this over gtm_grade.", "see 'Researched verdict' below; blank = not researched"),
-    ("F", "engaged_at", "The REAL date they forked/starred (fork date preferred). Use this, not best_rank. Blank for star-only fetched without a token (HTML has no star dates).", "YYYY-MM-DD"),
-    ("F", "rank / best_rank", "Internal recency RANK (1 = newest) used only for sorting — read engaged_at for the actual date.", "1..N"),
+    ("F", "engaged_at", "The REAL date they forked/starred (fork date preferred) — the recency column. Blank for star-only fetched without a token (HTML carries no star dates). (Rows are still sorted newest-first internally.)", "YYYY-MM-DD"),
     ("H", "Engagement & recency"),
     ("F", "source", "How they engaged. fork = took the code (stronger intent); both = strongest.", "star / fork / both"),
     ("F", "fork_rank / star_rank", "Position in each list (blank if not in that list).", "1..N or blank"),
@@ -453,7 +452,7 @@ def icpmod_floor_b():
 
 COMPANY_FEED_COLS = ["company", "research_status", "icp_verdict", "category", "company_status",
                      "evidence", "memory_value", "best_grade", "lead_count", "engaged_at",
-                     "best_rank", "sources", "what_they_do", "lead_with", "next_action"]
+                     "sources", "what_they_do", "lead_with", "next_action"]
 _STATUS_ORD = {"proven": 0, "to-verify": 1, "unproven": 2}
 # research_status = the single "what to do next" gate (kills manual shortlist rebuilding):
 #   done     -> already has an icp_verdict
@@ -527,7 +526,7 @@ def _company_feed(b, verdicts):
     return rows
 
 
-CEND_SHORTLIST_COLS = ["rank", "engaged_at", "name", "login", "source", "gtm_grade", "focus",
+CEND_SHORTLIST_COLS = ["engaged_at", "name", "login", "source", "gtm_grade", "focus",
                        "followers", "tried", "reachable", "linkedin", "twitter", "email", "website",
                        "github", "bio", "notable_repos"]
 
@@ -661,7 +660,8 @@ def run_gtm(slug, icp_id, scraped_this_run=0):
         w = csv.DictWriter(f, fieldnames=BEND_COLS); w.writeheader()
         w.writerows(emit(b, BEND_COLS) + emit(c, BEND_COLS))
     with open(paths["csv_company_feed"], "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=COMPANY_FEED_COLS); w.writeheader(); w.writerows(feed)
+        w = csv.DictWriter(f, fieldnames=COMPANY_FEED_COLS, extrasaction="ignore")
+        w.writeheader(); w.writerows(feed)  # rows keep best_rank for sorting; not emitted
     # field legend (also a sheet in the xlsx) for whoever opens the CSVs in Sheets/Excel
     with open(paths["explanation_csv"], "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f); w.writerow(["section", "field", "what_it_means", "values"])
