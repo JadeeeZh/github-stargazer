@@ -44,7 +44,7 @@ A **new ICP on the same repo just re-scores** — no re-scrape: `python app.py s
 
 | command | what it does |
 |---|---|
-| `run <repos…> --icp <id> [--token][--deepline][--refresh-seeds]` | full pipeline, one or many repos |
+| `run <repos…> --icp <id> [--token][--website][--deepline]` | pipeline (website crawl is opt-in via --website) |
 | `score <repo> --icp <id>` | re-score against an ICP, **zero network** (joins verdicts) |
 | `rescore --icp <id> [repos…]` | fan a swapped ICP across already-scraped repos |
 | `status [--repo X][--icp Y]` | show `fresh / re-score / re-scrape` per `(repo,ICP)` |

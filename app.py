@@ -43,12 +43,13 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="app.py", description="GitHub stargazers + forkers -> ICP CRM")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sp = sub.add_parser("run", help="full pipeline: fetch stars+forks -> enrich -> website -> [deepline] -> score")
+    sp = sub.add_parser("run", help="pipeline: fetch stars+forks -> enrich -> score (add --website / --deepline)")
     sp.add_argument("repos", nargs="*", help="owner/repo ... (or use --repos / repos.txt)")
     sp.add_argument("--repos", dest="repos_file", default=None, help="file with one owner/repo per line")
     sp.add_argument("--icp", default=None, help="ICP id (icps/<id>.md) or a path; default = sole ICP")
     sp.add_argument("--limit", type=int, default=100000)
     sp.add_argument("--token", default=None, help="GitHub token (or env GITHUB_TOKEN)")
+    sp.add_argument("--website", action="store_true", help="also crawl personal sites for contacts (slow; off by default)")
     sp.add_argument("--deepline", action="store_true", help="also resolve LinkedIn via deepline (paid)")
     sp.add_argument("--refresh-seeds", action="store_true", help="re-fetch stargazers/forkers even if cached")
     sp.add_argument("--sleep", type=float, default=0.4)
@@ -114,7 +115,8 @@ def main(argv=None):
                 print(f"[{slug}] reusing cached forkers")
             _, n = enrich.run(slug, sleep=args.sleep, limit=args.limit)
             scraped[slug] = n
-        website.run(slugs=repos, sleep=max(args.sleep, 0.4))
+        if args.website:
+            website.run(slugs=repos, sleep=max(args.sleep, 0.4))
         for slug in repos:
             if args.deepline:
                 from stargazer import deepline_lookup

@@ -9,7 +9,7 @@ from . import config, seed
 from .http import get
 from .enrich import rebuild_combined
 
-SUBPAGES = ["", "/about", "/about-me", "/contact", "/links", "/me"]
+SUBPAGES = ["", "/about", "/contact"]  # trimmed for speed (was 6 pages)
 
 
 def _clean_li(url):
@@ -22,7 +22,7 @@ def _crawl(base):
     base = base.rstrip("/")
     li = tw = em = ""
     for sp in SUBPAGES:
-        html, status = get(base + sp, timeout=15, tries=2, max_bytes=600_000)
+        html, status = get(base + sp, timeout=8, tries=1, max_bytes=400_000)
         if status != 200 or not html:
             continue
         if not li:
