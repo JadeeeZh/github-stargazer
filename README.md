@@ -8,7 +8,7 @@ more repos**; output is one clean folder per `(repo × ICP)`.
 ```
 input:  icps/<icp>.md  +  one or more owner/repo
             │
-  fetch stars + forks ─▶ enrich profiles (shared cache) ─▶ crawl sites ─▶ [deepline] ─▶ score against ICP
+  fetch stars + forks ─▶ enrich profiles (shared cache) ─▶ [--website crawl] ─▶ [deepline] ─▶ score against ICP
             │                                                                                │
             └──────────────────────────────────────────────────────────────────  runs/<repo>/<icp>/
                                                                                      ├─ bend_company_feed.csv   (B-end → your enrichment)
