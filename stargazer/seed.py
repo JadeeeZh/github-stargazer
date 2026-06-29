@@ -51,15 +51,21 @@ def load_seeds(slug):
 
 
 def all_logins(slug, seeds=None):
-    """Union for one repo: stars in star-rank order, then NEW forkers in fork-rank order."""
+    """Union for one repo, ordered by RECENCY across both sources (most-recent engagement
+    first). This matters under a --limit: a stars-first order would enrich all stargazers
+    before any forker and starve forks (the higher-intent signal) on big repos. Ordering by
+    best_rank (min of star/fork rank) grabs the freshest from BOTH. Forks win exact ties."""
     seeds = seeds if seeds is not None else load_seeds(slug)
-    stars = sorted([l for l, v in seeds.items() if v["star_rank"] is not None],
-                   key=lambda l: seeds[l]["star_rank"])
-    star_set = set(stars)
-    forks = sorted([l for l, v in seeds.items()
-                    if v["fork_rank"] is not None and l not in star_set],
-                   key=lambda l: seeds[l]["fork_rank"])
-    return stars + forks
+
+    def key(l):
+        v = seeds[l]
+        sr, fr = v["star_rank"], v["fork_rank"]
+        ranks = [r for r in (sr, fr) if isinstance(r, int)]
+        best = min(ranks) if ranks else 10 ** 9
+        is_fork = fr is not None
+        return (best, 0 if is_fork else 1, l)  # fresher first; fork before star on ties
+
+    return sorted(seeds.keys(), key=key)
 
 
 def source_of(login, seeds):
